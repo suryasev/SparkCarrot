@@ -170,9 +170,6 @@ class RMQReceiver[T: ClassTag, U <: Decoder[_] : ClassTag]
       Option(consumer.nextDelivery(1000)) match {
         case Some(response) => {
 
-          //TODO: Figure out how to surface errors via Slack
-          //TODO: Figure out what to do when we have bad rabbitmq input (partially solved)
-
           //We don't want an obscure data error to kill the production streaming process
           Try(cachedRecords += valueDecoder.fromBytes(response.getBody))
             .recover {
@@ -187,7 +184,7 @@ class RMQReceiver[T: ClassTag, U <: Decoder[_] : ClassTag]
             store(cachedRecords)
             resetArrayBuffer
             val latestDeliveryTag = response.getEnvelope.getDeliveryTag
-            channel.basicAck(latestDeliveryTag, true) //This cancels all messages with deliveryTag <= latestDeliveryTag
+            channel.basicAck(latestDeliveryTag, true) //This acknowledges receipt of all messages with deliveryTag <= latestDeliveryTag
             logInfo(s"Stored data for queue: ${rmqConfig.queue}")
           }
 
