@@ -1,0 +1,24 @@
+Library for creating reliable Spark RabbitMQ (AMQP) receivers.
+Reliable receivers should be able to avoid data loss, as the signal to delete a message from the queue
+only happens after the data is stored.
+
+Simple example:
+
+implicit val ssc = new StreamingContext(sparkConfForStreaming, Seconds(10))
+
+class LocalRMQConfig(queue: String) extends RMQConfig(queue, "localhost", 5672, "127.0.0.1")
+
+class StringDecoder extends Decoder[String] {
+  override def fromBytes(bytes: Array[Byte]): String = new String(bytes)
+}
+
+val config = new LocalRMQConfig("funQueue")
+val stream : ReceiverInputDStream[String] = RabbitUtils.createStream[String, StringDecoder](ssc, config)
+
+
+
+TODOs:
+Create tests
+More detailed documentation/examples
+Break Avro decoders into separate library to eliminate avro dependency
+Bump spark/spark-streaming versions
