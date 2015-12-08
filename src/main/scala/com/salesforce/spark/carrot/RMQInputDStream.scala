@@ -97,32 +97,34 @@ class RMQReceiver[T: ClassTag, U <: Decoder[_] : ClassTag]
     do {
       Option(consumer.nextDelivery(1000)) match {
         case Some(response) => {
+          Try {
+            //We don't want an obscure data error to kill the production streaming process
+            Try(cachedRecords += valueDecoder.fromBytes(response.getBody))
+              .recover {
+              case i: DecoderException ⇒ logError(s"DecoderException: ${i.getMessage}")
+            }
 
-          //We don't want an obscure data error to kill the production streaming process
-          Try(cachedRecords += valueDecoder.fromBytes(response.getBody))
-            .recover {
-            case i: DecoderException ⇒ logError(s"DecoderException: ${i.getMessage}")
+            //Reliable Receiver implementation that should in theory not lose any records
+            cntRecords += 1
+            if (System.currentTimeMillis > endTimestamp ||
+              cntRecords >= rmqConfig.maxElementsPerStore) {
+              store(cachedRecords)
+              resetArrayBuffer
+              val latestDeliveryTag = response.getEnvelope.getDeliveryTag
+              if (rmqConfig.acknowledgeReceipt)
+                channel.basicAck(latestDeliveryTag, true) //This acknowledges receipt of all messages with deliveryTag <= latestDeliveryTag
+
+              logInfo(s"Stored data for queue: ${rmqConfig.queue}")
+            }
+
+            delayer.reset()
+          }.recover {
             case e: java.net.ConnectException =>
               restart("Error connecting to RabbitMQ", e)
             case NonFatal(e) =>
               logWarning("Error receiving data", e)
               restart("Error receiving data", e)
           }
-
-          //Reliable Receiver implementation that should in theory not lose any records
-          cntRecords += 1
-          if (System.currentTimeMillis > endTimestamp ||
-            cntRecords >= rmqConfig.maxElementsPerStore) {
-            store(cachedRecords)
-            resetArrayBuffer
-            val latestDeliveryTag = response.getEnvelope.getDeliveryTag
-            if (rmqConfig.acknowledgeReceipt)
-              channel.basicAck(latestDeliveryTag, true) //This acknowledges receipt of all messages with deliveryTag <= latestDeliveryTag
-            
-            logInfo(s"Stored data for queue: ${rmqConfig.queue}")
-          }
-
-          delayer.reset()
         }
         case None => {
           logInfo(s"Channel Empty in queue: ${rmqConfig.queue}")
