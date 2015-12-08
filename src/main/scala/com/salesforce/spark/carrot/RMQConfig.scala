@@ -16,7 +16,9 @@ package com.salesforce.spark.carrot
  * @param baseDelay RabbitUtils uses an exponential decay for hitting the rabbitmq cluster in case of connectivity issues
  * @param storeTimeInterval When this many milliseconds have passed, store the data for use by downstream processing
  * @param maxElementsPerStore When this many elements have accrued, store the data for use by downstream processing
+ * @param acknowledgeReceipt Setting this to false will prevent acknowledgements of message receipts.  Useful for debugging
  */
 case class RMQConfig(queue: String, hostname: String, port: Int, alternativeHost: String,
                      username: Option[String] = None, password: Option[String] = None, baseDelay: Int = 5,
-                     storeTimeInterval: Long = 1800000, maxElementsPerStore: Int = 12500) extends Serializable
+                     storeTimeInterval: Long = 1800000, maxElementsPerStore: Int = 12500,
+                     acknowledgeReceipt: Boolean = true) extends Serializable

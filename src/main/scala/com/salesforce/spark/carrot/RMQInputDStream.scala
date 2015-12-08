@@ -112,11 +112,13 @@ class RMQReceiver[T: ClassTag, U <: Decoder[_] : ClassTag]
           //Reliable Receiver implementation that should in theory not lose any records
           cntRecords += 1
           if (System.currentTimeMillis > endTimestamp ||
-            cntRecords > rmqConfig.maxElementsPerStore) {
+            cntRecords >= rmqConfig.maxElementsPerStore) {
             store(cachedRecords)
             resetArrayBuffer
             val latestDeliveryTag = response.getEnvelope.getDeliveryTag
-            channel.basicAck(latestDeliveryTag, true) //This acknowledges receipt of all messages with deliveryTag <= latestDeliveryTag
+            if (rmqConfig.acknowledgeReceipt)
+              channel.basicAck(latestDeliveryTag, true) //This acknowledges receipt of all messages with deliveryTag <= latestDeliveryTag
+            
             logInfo(s"Stored data for queue: ${rmqConfig.queue}")
           }
 
